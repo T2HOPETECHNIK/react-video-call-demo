@@ -4,6 +4,35 @@ import Peer from "simple-peer";
 
 const VideoCallContext = createContext();
 
+// ICE servers tell WebRTC how to traverse NAT/firewalls.
+// STUN (free) discovers your public address; TURN relays media when a
+// direct connection is impossible. The relay hostnames below are public
+// (Metered), but the username/credential are secret and come from env
+// vars (set in client/.env locally, and in your host's dashboard in prod).
+const TURN_USERNAME = process.env.REACT_APP_TURN_USERNAME;
+const TURN_CREDENTIAL = process.env.REACT_APP_TURN_CREDENTIAL;
+
+const turnServers =
+  TURN_USERNAME && TURN_CREDENTIAL
+    ? [
+        "turn:global.relay.metered.ca:80",
+        "turn:global.relay.metered.ca:80?transport=tcp",
+        "turn:global.relay.metered.ca:443",
+        "turns:global.relay.metered.ca:443?transport=tcp",
+      ].map((urls) => ({
+        urls,
+        username: TURN_USERNAME,
+        credential: TURN_CREDENTIAL,
+      }))
+    : [];
+
+const peerConfig = {
+  iceServers: [
+    { urls: "stun:stun.relay.metered.ca:80" },
+    ...turnServers,
+  ],
+};
+
 const VideoCallProvider = ({ children }) => {
   const [userStream, setUserStream] = useState(null);
   const [call, setCall] = useState({});
@@ -92,6 +121,7 @@ const VideoCallProvider = ({ children }) => {
       initiator: false,
       trickle: false,
       stream: userStream,
+      config: peerConfig,
     });
 
     peer.on("signal", (data) => {
@@ -114,10 +144,15 @@ const VideoCallProvider = ({ children }) => {
   };
 
   const callUser = (targetId) => {
+    if (!targetId) {
+      alert("Enter an ID to call (paste the other person's ID).");
+      return;
+    }
     const peer = new Peer({
       initiator: true,
       trickle: false,
       stream: userStream,
+      config: peerConfig,
     });
     setPartnerUserId(targetId);
 
