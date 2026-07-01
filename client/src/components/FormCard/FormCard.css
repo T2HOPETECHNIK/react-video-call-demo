@@ -42,3 +42,32 @@
     margin-bottom: 3px !important;
     font-weight: 500 !important;
 }
+
+.caller-links {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0 0;
+}
+
+.caller-links li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.caller-links a {
+    color: #9B1FE8;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.caller-links a:hover {
+    text-decoration: underline;
+}
+
+.caller-link-url {
+    font-size: 12px;
+    color: #888;
+}

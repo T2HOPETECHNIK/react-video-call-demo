@@ -37,7 +37,10 @@ const ChatModal = ({
 
     if (receivedMessage.text && !isVisible) {
       if (notificationSound.current) {
-        notificationSound.current.play();
+        const playPromise = notificationSound.current.play();
+        if (playPromise) {
+          playPromise.catch(() => {});
+        }
       }
 
       toast.info(`${receivedMessage.text}`, {

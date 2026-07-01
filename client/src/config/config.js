@@ -6,4 +6,4 @@ import { io } from "socket.io-client";
 const URL = process.env.REACT_APP_SERVER_URL || "http://localhost:5050";
 
 export const socket = io(URL);
-export const navbarBrand = "YourVideoShare";
+export const navbarBrand = "EGH_VIDEO_CALL";

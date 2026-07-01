@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, createContext } from "react";
 import { socket } from "../config/config";
+import { getCurrentUser, getCallableUsers } from "../config/callers";
 import Peer from "simple-peer";
 
 const VideoCallContext = createContext();
@@ -34,15 +35,20 @@ const peerConfig = {
 };
 
 const VideoCallProvider = ({ children }) => {
+  // Identity comes from the URL path (e.g. /alice), not a random socket id.
+  const currentUser = getCurrentUser();
+  const callableUsers = currentUser ? getCallableUsers(currentUser.id) : [];
+
   const [userStream, setUserStream] = useState(null);
   const [call, setCall] = useState({});
   const [isCallAccepted, setIsCallAccepted] = useState(false);
   const [isCallEnded, setIsCallEnded] = useState(false);
-  const [myUserId, setMyUserId] = useState("");
+  const [myUserId] = useState(currentUser?.id || "");
   const [partnerUserId, setPartnerUserId] = useState("");
+  const [onlineUsers, setOnlineUsers] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
   const [receivedMessage, setReceivedMessage] = useState("");
-  const [name, setName] = useState("");
+  const [name, setName] = useState(currentUser?.name || "");
   const [opponentName, setOpponentName] = useState("");
   const [isMyVideoActive, setIsMyVideoActive] = useState(true);
   const [isPartnerVideoActive, setIsPartnerVideoActive] = useState();
@@ -72,8 +78,22 @@ const VideoCallProvider = ({ children }) => {
     };
 
     const handleSocketEvents = () => {
-      socket.on("socketId", (id) => {
-        setMyUserId(id);
+      // Announce our identity to the server now and on every reconnect, so
+      // the server can route calls to us by our stable userId.
+      const registerIdentity = () => {
+        if (currentUser) {
+          socket.emit("register", currentUser.id);
+        }
+      };
+      registerIdentity();
+      socket.on("connect", registerIdentity);
+
+      socket.on("presence", (onlineIds) => {
+        setOnlineUsers(onlineIds);
+      });
+
+      socket.on("callError", ({ message }) => {
+        alert(message);
       });
 
       socket.on("mediaStatusChanged", ({ mediaType, isActive }) => {
@@ -158,7 +178,7 @@ const VideoCallProvider = ({ children }) => {
 
     const handleSignal = (data) => {
       socket.emit("initiateCall", {
-        targetId,
+        targetUserId: targetId,
         signalData: data,
         senderId: myUserId,
         senderName: name,
@@ -174,6 +194,7 @@ const VideoCallProvider = ({ children }) => {
       setOpponentName(userName);
       peer.signal(signal);
       socket.emit("changeMediaStatus", {
+        targetUserId: targetId,
         mediaType: "both",
         isActive: [isMyMicActive, isMyVideoActive],
       });
@@ -195,6 +216,7 @@ const VideoCallProvider = ({ children }) => {
     });
 
     socket.emit("changeMediaStatus", {
+      targetUserId: partnerUserId,
       mediaType: "video",
       isActive: newStatus,
     });
@@ -211,6 +233,7 @@ const VideoCallProvider = ({ children }) => {
     });
 
     socket.emit("changeMediaStatus", {
+      targetUserId: partnerUserId,
       mediaType: "audio",
       isActive: newStatus,
     });
@@ -273,13 +296,13 @@ const VideoCallProvider = ({ children }) => {
 
   const endCall = () => {
     setIsCallEnded(true);
-    socket.emit("terminateCall", { targetId: partnerUserId });
+    socket.emit("terminateCall", { targetUserId: partnerUserId });
     peerConnectionRef.current.destroy();
     window.location.reload();
   };
 
   const endIncomingCall = () => {
-    socket.emit("terminateCall", { targetId: partnerUserId });
+    socket.emit("terminateCall", { targetUserId: partnerUserId });
   };
 
   const sendMessage = (text) => {
@@ -293,7 +316,7 @@ const VideoCallProvider = ({ children }) => {
     setChatMessages((prevMessages) => [...prevMessages, newMessage]);
 
     socket.emit("sendMessage", {
-      targetId: partnerUserId,
+      targetUserId: partnerUserId,
       message: text,
       senderName: name,
     });
@@ -311,6 +334,9 @@ const VideoCallProvider = ({ children }) => {
         setName,
         isCallEnded,
         myUserId,
+        currentUser,
+        callableUsers,
+        onlineUsers,
         callUser,
         endCall,
         receiveCall,

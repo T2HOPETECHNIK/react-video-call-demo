@@ -37,9 +37,46 @@ const IncomingCall = () => {
     }
   }, [call.from, call.isReceivingCall, isCallAccepted, setPartnerUserId]);
 
+  // Browsers block audio that plays before the user has interacted with the
+  // page. Prime the ringtone (play muted, then reset) on the first click or
+  // keypress so it's allowed to ring when a call later comes in.
+  useEffect(() => {
+    const unlockAudio = () => {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.muted = true;
+        const playPromise = audio.play();
+        if (playPromise) {
+          playPromise
+            .then(() => {
+              audio.pause();
+              audio.currentTime = 0;
+              audio.muted = false;
+            })
+            .catch(() => {
+              audio.muted = false;
+            });
+        }
+      }
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+
+    window.addEventListener("pointerdown", unlockAudio);
+    window.addEventListener("keydown", unlockAudio);
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
+
   useEffect(() => {
     if (showModal && audioRef.current) {
-      audioRef.current.play();
+      const playPromise = audioRef.current.play();
+      if (playPromise) {
+        // Autoplay can still be blocked if the user never interacted yet.
+        playPromise.catch(() => {});
+      }
     } else if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;

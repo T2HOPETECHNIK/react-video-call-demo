@@ -11,6 +11,19 @@
     content="A real-time video calling application that allows users to connect with each other, providing the ability to initiate video calls and control their audio and video settings." />
   <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
   <link rel="apple-touch-icon" href="favicon.png" />
+  <!-- Polyfill Node globals that simple-peer / readable-stream expect.
+       Create-React-App 5 (webpack 5) no longer provides these, which caused
+       "process is not defined" when tearing down a peer on hang-up. -->
+  <script>
+    window.global = window;
+    window.process = window.process || { env: {} };
+    if (!window.process.nextTick) {
+      window.process.nextTick = function (cb) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        setTimeout(function () { cb.apply(null, args); }, 0);
+      };
+    }
+  </script>
 </head>
 
 <body>
